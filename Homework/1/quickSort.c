@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <sys/time.h>
-#define ARRAYSIZE 100000000
+#define ARRAYSIZE 100
 double start_time, end_time; /* start and end times */
 void *quickSort(void *);
 int partition(int[], int, int);
@@ -92,7 +92,7 @@ int main(){
   int n = sizeof(listToBeSorted)/sizeof(listToBeSorted[0]);
   printf("\n");
   printf("Unsorted numbers: \n");
-  //printArray(listToBeSorted, n);
+  printArray(listToBeSorted, n);
   aData.inputArray = &listToBeSorted[0];
   aData.first = 0;
   aData.last = ARRAYSIZE - 1;
@@ -104,7 +104,7 @@ int main(){
   printf("\n");
   printf("\n");
   printf("\nSorted numbers: \n");
-  //printArray(listToBeSorted, n);
+  printArray(listToBeSorted, n);
   printf("\n");
   printf("\nThe execution time is %g sec", end_time - start_time);
   return 0;

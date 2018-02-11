@@ -164,19 +164,22 @@ void *Worker(void *arg) {
       }
     }
   }
-  pthread_mutex_lock(&mutexTwo);  /*Here we handel shared variables so we have to lock*/
-  for (i = 0; i < numWorkers; i++){
-    if(currentMax > globalMaxValue){
+  if(currentMax > globalMaxValue){
+      pthread_mutex_lock(&mutexTwo);  /*Here we handel shared variables so we have to lock*/
       globalMaxValue = currentMax;
       globalMaxX = currentxCordMax;
       globalMaxY = currentyCordMax;
+      pthread_mutex_unlock(&mutexTwo);  /*Here we handel shared variables so we have to lock*/
     }
     if(currentMin < globalMinValue){
+      pthread_mutex_lock(&mutexTwo);  /*Here we handel shared variables so we have to lock*/
       globalMinValue = currentMin;
       globalMinX = currentxCordMin;
       globalMinY = currentyCordMin;
+      pthread_mutex_unlock(&mutexTwo);
     }
-  }
+  pthread_mutex_lock(&mutexTwo);  /*Here we handel shared variables so we have to lock*/
   globalTotalSum += total;
   pthread_mutex_unlock(&mutexTwo);
+
 }
