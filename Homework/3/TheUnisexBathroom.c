@@ -41,11 +41,11 @@ int main(int argc, char *argv[]) {
 void* menEnter(void* arg){
   int id = (int) arg;
   time_t t;
-  srand((unsigned) time(&t));
+  srand((unsigned) time(&t) * id);
   while(1){
     usleep(1000000 + rand() % 5000000);
     sem_wait(&bathroomLock);
-    if(womenInBathroom > 0){
+    if(womenInBathroom > 0 || womenInQueue > 0){
       menInQueue ++;
       printf("\nMen in queue = %d", menInQueue );
       sem_post(&bathroomLock);
@@ -78,11 +78,11 @@ void* menEnter(void* arg){
 void* womenEnter(void* arg){
   int id = (int) arg;
   time_t t;
-  srand((unsigned) time(&t));
+  srand((unsigned) time(&t) * id);
   while(1){
     usleep(1000000 +rand() % 5000000);
     sem_wait(&bathroomLock);
-    if(menInBathroom > 0){
+    if(menInBathroom > 0 || menInQueue > 0){
       womenInQueue ++;
       printf("\nWomen in queue = %d", womenInQueue );
       sem_post(&bathroomLock);
