@@ -7,6 +7,8 @@
 #define DEFAULTMEN 100
 #define DEFAULTWOMEN 100
 #define SHARED 1
+#define WORKTIME 5000000
+#define WCTIME 1000000
 void* menEnter(void*);
 void* womenEnter(void*);
 
@@ -43,7 +45,7 @@ void* menEnter(void* arg){
   time_t t;
   srand((unsigned) time(&t) * id);
   while(1){
-    usleep(1000000 + rand() % 5000000);
+    usleep(rand() % WORKTIME);
     sem_wait(&bathroomLock);
     if(womenInBathroom > 0 || womenInQueue > 0){
       menInQueue ++;
@@ -60,7 +62,7 @@ void* menEnter(void* arg){
     }
     ////////////////inside bathroom/////////////////////////
     printf("\n-Man with id %d ENTERS bathroom", id);
-    usleep(1000000 + rand() % 2000000);
+    usleep(rand() % WCTIME);
     ////////////////leaving bathroom///////////////////////
     sem_wait(&bathroomLock);
     menInBathroom --;
@@ -80,7 +82,7 @@ void* womenEnter(void* arg){
   time_t t;
   srand((unsigned) time(&t) * id);
   while(1){
-    usleep(1000000 +rand() % 5000000);
+    usleep(rand() % WORKTIME);
     sem_wait(&bathroomLock);
     if(menInBathroom > 0 || menInQueue > 0){
       womenInQueue ++;
@@ -97,7 +99,7 @@ void* womenEnter(void* arg){
     }
     ////////////////inside bathroom/////////////////////////
     printf("\n-Woman with id %d ENTERS bathroom", id);
-    usleep(1000000 + rand() % 2000000);
+    usleep(rand() % WCTIME);
     ////////////////leaving bathroom///////////////////////
     sem_wait(&bathroomLock);
     womenInBathroom --;
