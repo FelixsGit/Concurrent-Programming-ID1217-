@@ -18,7 +18,8 @@ public class Bathroom {
         lock.lock();
         if(womenInBathroom >  0 || womenInQueue > 0){
             menInQueue ++;
-            System.out.println("After "+ (System.currentTimeMillis() - startTime)+ " milliseconds ---" + " man with id "+ id +" enters queue");
+            System.out.println("After "+ (System.currentTimeMillis() - startTime)
+                    + " milliseconds ---" + " man with id "+ id +" enter queue");
             men.await();
         }
         menInBathroom ++;
@@ -26,14 +27,16 @@ public class Bathroom {
             menInQueue --;
             men.signal();
         }
-        System.out.println("After "+ (System.currentTimeMillis() - startTime)+ " milliseconds ---" + " man with id " + id + " enter bathroom");
+        System.out.println("After "+ (System.currentTimeMillis() - startTime)
+                + " milliseconds ---" + " man with id " + id + " enter bathroom");
         lock.unlock();
     }
 
     public void manExit(long id){
         lock.lock();
         menInBathroom --;
-        System.out.println("After "+ (System.currentTimeMillis() - startTime)+ " milliseconds ---" + " man with id " + id + " leave bathroom");
+        System.out.println("After "+ (System.currentTimeMillis() - startTime)
+                + " milliseconds ---" + " man with id " + id + " leave bathroom");
         if(menInBathroom == 0 && womenInQueue > 0){
             System.out.println("\n---Womans turn---\n");
             womenInQueue --;
@@ -48,7 +51,8 @@ public class Bathroom {
         lock.lock();
         if(menInBathroom >  0 || menInQueue > 0){
             womenInQueue ++;
-            System.out.println("After "+ (System.currentTimeMillis() - startTime)+ " milliseconds ---" + " woman with id " + id + " enter queue");
+            System.out.println("After "+ (System.currentTimeMillis() - startTime)
+                    + " milliseconds ---" + " woman with id " + id + " enter queue");
             women.await();
         }
         womenInBathroom ++;
@@ -56,14 +60,16 @@ public class Bathroom {
             womenInQueue--;
             women.signal();
         }
-        System.out.println("After "+ (System.currentTimeMillis() - startTime)+ " milliseconds ---" + " woman with id " + id  + " enter bathroom");
+        System.out.println("After "+ (System.currentTimeMillis() - startTime)
+                + " milliseconds ---" + " woman with id " + id  + " enter bathroom");
         lock.unlock();
     }
 
     public void womanExit(long id){
         lock.lock();
         womenInBathroom --;
-        System.out.println("After "+ (System.currentTimeMillis() - startTime)+ " milliseconds ---" + " woman with id " + id + " leave bathroom time: ");
+        System.out.println("After "+ (System.currentTimeMillis() - startTime)
+                + " milliseconds ---" + " woman with id " + id + " leave bathroom");
         if(womenInBathroom == 0 && menInQueue > 0) {
             System.out.println("\n---Mens turn---\n");
             menInQueue--;
