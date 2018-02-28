@@ -7,32 +7,34 @@
 #include <sys/times.h>
 #include <pthread.h>
 
-#define NUMBEROFBODIES 120
+#define DEFAULTBODIES 100
 #define DT 1
-#define TIMESTEPS 2700
-#define NUMBEROFTHREADS 1
+#define DEFAULTTIMESTEPS 1000
+#define DEFAULTHREADS 1
 
 static double G = 0.0000000000667;
-void* calculateForces();
-int moveBodies();
+void calculateForces();
+void* work();
+void moveBodies();
 void start_clock(void);
 void end_clock();
 static clock_t st_time;
 static clock_t en_time;
 static struct tms st_cpu;
 static struct tms en_cpu;
-int count = 0;
 int numArrived = 0;
-int numWorkers = NUMBEROFTHREADS;
-pthread_t thread[NUMBEROFTHREADS];
 pthread_mutex_t barrier;  /* mutex lock for the barrier */
 pthread_mutex_t counter;
 pthread_cond_t go;        /* condition variable for leaving */
 
+int numberOfThreads;
+int numberOfBodies;
+int numberOfTimesteps;
+
 void Barrier() {
   pthread_mutex_lock(&barrier);
   numArrived++;
-  if (numArrived == numWorkers) {
+  if (numArrived == numberOfThreads) {
     numArrived = 0;
     pthread_cond_broadcast(&go);
   }
@@ -57,40 +59,58 @@ typedef struct body{
     double deltapY;
 }body;
 
-body bodies[NUMBEROFBODIES];
 
-int main(){
+int main(int argc, char *argv[]) {
+  numberOfBodies = ((argc > 1)? atoi(argv[1]) : DEFAULTBODIES);
+  numberOfTimesteps = ((argc > 2)? atoi(argv[2]) : DEFAULTTIMESTEPS);
+  numberOfThreads = ((argc > 3)? atoi(argv[3]) : DEFAULTHREADS);
+  pthread_t thread[numberOfThreads];
+  body *bodies = (body*) malloc(sizeof(body) * numberOfBodies);
+  pthread_mutex_init(&barrier, NULL);
+  pthread_mutex_init(&counter, NULL);
+  pthread_cond_init(&go, NULL);
 
-  for(int i = 0; i < NUMBEROFBODIES; i++){
+  for(int i = 0; i < numberOfBodies; i++){
     time_t t;
     srand((unsigned) time(&t) * (i + 1));
     bodies[i].posX = rand()%1000;
     bodies[i].posY = rand()%1000;
-    bodies[i].mass = 100000000000;
+    bodies[i].mass = rand()%100000000000;
   }
 
   start_clock();
-  for(long i = 0; i < NUMBEROFTHREADS; i++){
-    pthread_create(&thread[i], NULL, calculateForces, (void *) i);
+  for(long i = 0; i < numberOfThreads; i++){
+    pthread_create(&thread[i], NULL, work, (void *) i);
   }
 
-  for(int i = 0; i < NUMBEROFTHREADS; i++){
+  for(int i = 0; i < numberOfThreads; i++){
       pthread_join(thread[i], NULL);
   }
   end_clock();
-  for(long i = 0; i < NUMBEROFBODIES; i++){
+  for(long i = 0; i < numberOfBodies; i++){
     printf("Body %d velX = %lf & velY = %lf lu/tu\n", i + 1, bodies[i].velX, bodies[i].velY);
   }
 }
 
-void* calculateForces(void* arg){
+void* work(void* arg){
   long id = (long) arg;
+  for(int i = 0; i < numberOfTimesteps; i++){
+    //printf("\nITERATION %d starting", i );
+    calculateForces(id);
+    Barrier();
+    moveBodies(id);
+    Barrier();
+  }
+}
+void calculateForces(void* arg){
+  long id = (long) arg;
+  //printf("\nthread with id %d calculateForces");
   //printf("Thread with id = %d\n working on forces", id );
   double distance;
   double magnitude;
   body direction;
-  for(int i = id; i < NUMBEROFBODIES; i+= NUMBEROFTHREADS) {
-    for(int j = i + 1; j < NUMBEROFBODIES; j++){
+  for(int i = id; i < numberOfBodies; i+= numberOfThreads) {
+    for(int j = i + 1; j < numberOfBodies; j++){
       distance = sqrt(((bodies[i].posX - bodies[j].posX) * (bodies[i].posX - bodies[j].posX)) +
       ((bodies[i].posY - bodies[j].posY) * (bodies[i].posY - bodies[j].posY)));
       //printf("\nDistance between body %d and %d: %lf le", i + 1, j + 1, distance);
@@ -104,13 +124,13 @@ void* calculateForces(void* arg){
       bodies[j].forceY = bodies[j].forceY - (magnitude * (direction.dirY / distance));
     }
   }
-  Barrier();
-  moveBodies(id);
 }
-  int moveBodies(long arg) {
+  void moveBodies(long arg) {
+    long id = (long) arg;
+    //printf("\nthread with id %d moving bodies", id);
     body deltap;
     body deltav;
-    for(int i = arg; i < NUMBEROFBODIES; i+=NUMBEROFTHREADS) {
+    for(int i = id; i < numberOfBodies; i+= numberOfThreads) {
       deltav.deltavX = (bodies[i].forceX / bodies[i].mass) * DT;
       deltav.deltavY = (bodies[i].forceY / bodies[i].mass) * DT;
       deltap.deltapX = (bodies[i].velX + deltav.deltavX / 2) * DT,
@@ -120,15 +140,6 @@ void* calculateForces(void* arg){
       bodies[i].posX = bodies[i].posX + deltap.deltapX;
       bodies[i].posY = bodies[i].posY + deltap.deltapY;
       bodies[i].forceX = bodies[i].forceY = 0.0; // reset force vector
-  }
-  Barrier();
-  pthread_mutex_lock(&counter);
-  if(count < TIMESTEPS){
-    count++;
-    pthread_mutex_unlock(&counter);
-    calculateForces((void*)arg);
-  }else{
-    pthread_mutex_unlock(&counter);
   }
 }
 
