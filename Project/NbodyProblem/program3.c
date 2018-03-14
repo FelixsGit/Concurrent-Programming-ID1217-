@@ -43,7 +43,7 @@ typedef struct Node{
   bool isLeaf;
   bool hasParticle;
   struct vector pos;
-  int size;
+  double size;
   double totalMass;
   struct Node* nw;
   struct Node* ne;
@@ -54,8 +54,8 @@ typedef struct Node{
 
 
 Node* findQuadrant(vector pos, Node* parent){
-  if(pos.x > parent->size/2){
-   if(pos.y > parent->size/2){
+  if(pos.x >= parent->pos.x + parent->size/2){
+   if(pos.y >= parent->pos.y + parent->size/2){
      printf("\nParticle with pos {%lf, %lf} was found in NE",pos.x,pos.y);
      return parent->ne;
    }
@@ -65,7 +65,7 @@ Node* findQuadrant(vector pos, Node* parent){
    }
   }
   else{
-   if(pos.y > parent->size/2){
+   if(pos.y >= parent->pos.y + parent->size/2){
      printf("\nParticle with pos {%lf, %lf} was found in NW",pos.x,pos.y);
      return parent->nw;
    }
@@ -83,11 +83,16 @@ void insertIntoTree(body particle, Node* node){
     node->hasParticle = true;
   }
   else if(!node->isLeaf && node->hasParticle){
+    printf("\n%lf", node->totalMass );
     Node* newNodeToGoTo = findQuadrant(particle.pos, node);
     insertIntoTree(particle, newNodeToGoTo);
   }
   else if(node->isLeaf && node->hasParticle){
     printf("\nNodes in same tree");
+    if((node->bodyInNode.pos.x == particle.pos.x) && (node->bodyInNode.pos.y == particle.pos.y)){
+      printf("\nCRASH");
+      exit(1);
+    }
     node->isLeaf = false;
     initChildren(node);
     Node* newNodeToGoToOldBody = findQuadrant(node->bodyInNode.pos, node);
@@ -103,11 +108,11 @@ void initChildren(Node* parent){
   parent->sw = (Node*)malloc(sizeof(Node));
   parent->se = (Node*)malloc(sizeof(Node));
 
-  int sizeOfChildren = parent->size/2;
+  double sizeOfChildren = parent->size/2;
   parent->nw->size = parent->ne->size = parent->sw->size = parent->se->size = sizeOfChildren;
 
   parent->nw->pos.x = parent->pos.x;
-  parent->nw->pos.y = parent->size + sizeOfChildren;
+  parent->nw->pos.y = parent->pos.y + sizeOfChildren;
   parent->nw->isLeaf = true;
   parent->nw->hasParticle = false;
   parent->nw->totalMass = 0.0;
@@ -151,7 +156,7 @@ int main(int argc, char *argv[]) {
     insertIntoTree(bodies[i], root);
   }
 
-  //printf("%lf", root->totalMass);
+  printf("\ntotalMass of root = %lf", root->totalMass);
 
   /*
   start_clock();
