@@ -56,17 +56,21 @@ typedef struct Node{
 Node* findQuadrant(vector pos, Node* parent){
   if(pos.x > parent->size/2){
    if(pos.y > parent->size/2){
+     printf("\nParticle with pos {%lf, %lf} was found in NE",pos.x,pos.y);
      return parent->ne;
    }
    else{
+     printf("\nParticle with pos {%lf, %lf} was found in SE",pos.x,pos.y);
      return parent->se;
    }
   }
   else{
    if(pos.y > parent->size/2){
+     printf("\nParticle with pos {%lf, %lf} was found in NW",pos.x,pos.y);
      return parent->nw;
    }
    else{
+     printf("\nParticle with pos {%lf, %lf} was found in SW",pos.x,pos.y);
      return parent->sw;
    }
  }
@@ -83,12 +87,12 @@ void insertIntoTree(body particle, Node* node){
     insertIntoTree(particle, newNodeToGoTo);
   }
   else if(node->isLeaf && node->hasParticle){
+    printf("\nNodes in same tree");
+    node->isLeaf = false;
     initChildren(node);
     Node* newNodeToGoToOldBody = findQuadrant(node->bodyInNode.pos, node);
-    newNodeToGoToOldBody->hasParticle = true;
     insertIntoTree(node->bodyInNode, newNodeToGoToOldBody);
     Node* newNodeToGoToNewBody = findQuadrant(particle.pos, node);
-    newNodeToGoToNewBody->hasParticle = true;
     insertIntoTree(particle, newNodeToGoToNewBody);
   }
 }
@@ -147,7 +151,7 @@ int main(int argc, char *argv[]) {
     insertIntoTree(bodies[i], root);
   }
 
-  printf("%lf", root->totalMass);
+  //printf("%lf", root->totalMass);
 
   /*
   start_clock();
