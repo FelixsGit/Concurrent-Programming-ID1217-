@@ -17,7 +17,7 @@ void* work();
 void moveBodies();
 void start_clock(void);
 void end_clock();
-void inserIntoTree();
+void insertIntoTree();
 static clock_t st_time;
 static clock_t en_time;
 static struct tms st_cpu;
@@ -51,56 +51,71 @@ typedef struct Node{
   struct vector centerOfMass;
 }Node;
 
-Node *root;
+struct tree {
+  struct Node* root;
+} quadTree;
 
-Node *findQuadrant(body bod, struct Node *node){
-  struct Node *nodeToGoTo;
-  //going to nw
-  if((bod.pos.x < node->size/2) && (bod.pos.y >= node->size/2)){
-      node->nw->size = node->size/2;
-      node->nw->pos.x = node->pos.x;
-      node->nw->pos.y = node->pos.y + node->size/2;
-      nodeToGoTo = node->nw;
-
-  //going to ne
-}else if((bod.pos.x >= node->size/2) && (bod.pos.y >= node->size/2)){
-      node->ne->size = node->size/2;
-      node->ne->pos.x = node->pos.x + node->size/2;
-      node->ne->pos.y = node->pos.y + node->size/2;
-      nodeToGoTo = node->nw;
-
-  //going to sw
-}else if((bod.pos.x < node->size/2) && (bod.pos.y < node->size/2)){
-      node->sw->size = node->size/2;
-      node->sw->pos.x = node->pos.x;
-      node->sw->pos.y = node->pos.y;
-      nodeToGoTo = node->nw;
-
-  //going to se
-}else if((bod.pos.x >= node->size/2) && (bod.pos.y < node->size/2)){
-      node->se->size = node->size/2;
-      node->se->pos.x = node->pos.x + node->size/2;
-      node->se->pos.y = node->pos.y;
-      nodeToGoTo = node->nw;
-  }
-  return nodeToGoTo;
+void newTree(int worldSize) {
+  struct Node *root;
+  quadTree.root = root;
+  quadTree.root->size = worldSize;
+  quadTree.root->pos.x = 0;
+  quadTree.root->pos.y = 0;
 }
 
-void inserIntoTree(body bodies, struct Node *node){
-  if(!node->isLeaf && node->hasParticle){
-    Node *newNodeToGoTo = findQuadrant(bodies, node);
-    inserIntoTree(bodies, newNodeToGoTo);
+Node *findQuadrant(struct vector pos, struct Node parent){
+  if(pos.x > parent.size/2){
+   if(pos.y > parent.size/2){
+     return parent.ne;
+   }
+   else{
+     return parent.se;
+   }
   }
+  else{
+   if(pos.y > parent.size/2){
+     return parent.nw;
+   }
+   else{
+     return parent.sw;
+   }
+ }
+}
+
+void insertIntoTree(struct body particle, struct Node *node){
   if(node->isLeaf && !node->hasParticle){
-    node->bodyInNode = bodies;
+    node->bodyInNode = particle;
     node->hasParticle = true;
   }
-  if(node->isLeaf && node->hasParticle){
-    Node *newNodeToGoToOldBody = findQuadrant(node->bodyInNode, node);
-    Node *newNodeToGoToNewBody= findQuadrant(bodies, node);
-    inserIntoTree(node->bodyInNode, newNodeToGoToOldBody);
-    inserIntoTree(bodies, newNodeToGoToNewBody);
+  else if(!node->isLeaf && node->hasParticle){
+    struct Node *newNodeToGoTo = findQuadrant(particle.pos, *node);
+    insertIntoTree(particle, newNodeToGoTo);
   }
+  else if(node->isLeaf && node->hasParticle){
+    initChildren(node);
+    struct Node *newNodeToGoToOldBody = findQuadrant(node->bodyInNode.pos, *node);
+    newNodeToGoToOldBody->hasParticle = true;
+    insertIntoTree(node->bodyInNode, newNodeToGoToOldBody);
+    struct Node *newNodeToGoToNewBody= findQuadrant(particle.pos, *node);
+    newNodeToGoToNewBody->hasParticle = true;
+    insertIntoTree(particle, newNodeToGoToNewBody);
+  }
+}
+
+void initChildren(struct Node *parent){
+  int sizeOfChildren = parent->size/2;
+  parent->nw->size = parent->ne->size = parent->sw->size = parent->se->size = sizeOfChildren;
+  parent->sw->pos.x = parent->pos.x;
+  parent->sw->pos.y = parent->size + sizeOfChildren;
+
+  parent->ne->pos.x = parent->pos.x + sizeOfChildren;
+  parent->ne->pos.y = parent->pos.y + sizeOfChildren;
+
+  parent->sw->pos.x = parent->pos.x;
+  parent->sw->pos.y = parent->pos.y;
+
+  parent->se->pos.x = parent->pos.x + sizeOfChildren;
+  parent->se->pos.y = parent->pos.y;
 }
 
 int main(int argc, char *argv[]) {
@@ -108,23 +123,20 @@ int main(int argc, char *argv[]) {
   numberOfTimesteps = ((argc > 2)? atoi(argv[2]) : DEFAULTTIMESTEPS);
 
   initBodies();
-
-  root->pos.x = 0;
-  root->pos.y = 0;
-  root->size = 100;
-  root->isLeaf = true;
-  root->hasParticle = false;
+  newTree(100);
 
   for(int i = 0; i < numberOfBodies; i++){
-    inserIntoTree(bodies[i], root);
+    insertIntoTree(bodies[i], quadTree.root);
   }
 
+  /*
   start_clock();
   for(int i = 0; i < numberOfTimesteps; i++){
     calculateForces();
     moveBodies();
   }
   end_clock();
+  */
 
 }
 
@@ -133,8 +145,8 @@ void initBodies(){
   for(int i = 0; i < numberOfBodies; i++){
     time_t t;
     srand((unsigned) time(&t) * (i + 1));
-    bodies[i].pos.x = rand()%100;
-    bodies[i].pos.y = rand()%100;
+    bodies[i].pos.x = rand()%98 + 1;
+    bodies[i].pos.y = rand()%98 + 1;
     bodies[i].mass = 1 + rand()%100000000000;
   }
 }
