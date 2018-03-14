@@ -56,21 +56,21 @@ typedef struct Node{
 Node* findQuadrant(vector pos, Node* parent){
   if(pos.x >= parent->pos.x + parent->size/2){
    if(pos.y >= parent->pos.y + parent->size/2){
-     printf("\nParticle with pos {%lf, %lf} was found in NE",pos.x,pos.y);
+     //printf("\nParticle with pos {%lf, %lf} was found in NE",pos.x,pos.y);
      return parent->ne;
    }
    else{
-     printf("\nParticle with pos {%lf, %lf} was found in SE",pos.x,pos.y);
+     //printf("\nParticle with pos {%lf, %lf} was found in SE",pos.x,pos.y);
      return parent->se;
    }
   }
   else{
    if(pos.y >= parent->pos.y + parent->size/2){
-     printf("\nParticle with pos {%lf, %lf} was found in NW",pos.x,pos.y);
+     //printf("\nParticle with pos {%lf, %lf} was found in NW",pos.x,pos.y);
      return parent->nw;
    }
    else{
-     printf("\nParticle with pos {%lf, %lf} was found in SW",pos.x,pos.y);
+     //printf("\nParticle with pos {%lf, %lf} was found in SW",pos.x,pos.y);
      return parent->sw;
    }
  }
@@ -83,7 +83,6 @@ void insertIntoTree(body particle, Node* node){
     node->hasParticle = true;
   }
   else if(!node->isLeaf && node->hasParticle){
-    printf("\n%lf", node->totalMass );
     Node* newNodeToGoTo = findQuadrant(particle.pos, node);
     insertIntoTree(particle, newNodeToGoTo);
   }
@@ -138,6 +137,54 @@ void initChildren(Node* parent){
 
 Node *root;
 
+void summarizeTree() {
+  setCenterOfMasses(root);
+}
+
+vector ZERO_VECTOR(){
+  struct vector v;
+  v.x = 0;
+  v.y = 0;
+  return v;
+}
+vector calcNumeratorCOM(struct Node* n) {
+  struct vector v;
+  if(n->isLeaf && !n->hasParticle) {
+    v = ZERO_VECTOR();
+  }
+  else if(n->isLeaf && n->hasParticle) {
+    v.x = n->bodyInNode.mass * n->bodyInNode.pos.x;
+    v.y = n->bodyInNode.mass * n->bodyInNode.pos.y;
+  }
+  else{
+    struct vector v1, v2, v3, v4;
+    v1 = calcNumeratorCOM(n->nw);
+    v2 = calcNumeratorCOM(n->ne);
+    v3 = calcNumeratorCOM(n->sw);
+    v4 = calcNumeratorCOM(n->se);
+    v.x = v1.x + v2.x + v3.x + v4.x;
+    v.y = v1.y + v2.y + v3.y + v4.y;
+  }
+  return v;
+}
+
+void setCenterOfMasses(struct Node* n) {
+  // Only set center of mass on internal nodes
+  if(n->isLeaf){
+    return;
+  }
+  struct vector v = calcNumeratorCOM(n);
+  struct vector res = ZERO_VECTOR();
+  res.x = v.x / n->totalMass;
+  res.y = v.y / n->totalMass;
+  n->centerOfMass = res;
+
+  setCenterOfMasses(n->nw);
+  setCenterOfMasses(n->ne);
+  setCenterOfMasses(n->sw);
+  setCenterOfMasses(n->se);
+}
+
 int main(int argc, char *argv[]) {
   numberOfBodies = ((argc > 1)? atoi(argv[1]) : DEFAULTBODIES);
   numberOfTimesteps = ((argc > 2)? atoi(argv[2]) : DEFAULTTIMESTEPS);
@@ -155,8 +202,8 @@ int main(int argc, char *argv[]) {
   for(int i = 0; i < numberOfBodies; i++){
     insertIntoTree(bodies[i], root);
   }
-
-  printf("\ntotalMass of root = %lf", root->totalMass);
+  summarizeTree();
+  printf("\ncenter of mass of root {%lf, %lf}", root->centerOfMass.x, root->centerOfMass.y);
 
   /*
   start_clock();
