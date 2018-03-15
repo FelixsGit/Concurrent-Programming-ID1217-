@@ -9,6 +9,7 @@
 #define DEFAULTBODIES 100
 #define DT 1
 #define DEFAULTTIMESTEPS 1000
+#define DEFAULTFAR 10
 const double G = 0.0000000000667;
 
 void calculateForces();
@@ -19,12 +20,16 @@ void start_clock(void);
 void end_clock();
 void insertIntoTree();
 void initChildren();
+void setCenterOfMasses();
+void freeTree();
 static clock_t st_time;
 static clock_t en_time;
 static struct tms st_cpu;
 static struct tms en_cpu;
 int numberOfBodies;
 int numberOfTimesteps;
+double far;
+double spaceSize = 1000;
 
 typedef struct vector{
   double x;
@@ -87,9 +92,9 @@ void insertIntoTree(body particle, Node* node){
     insertIntoTree(particle, newNodeToGoTo);
   }
   else if(node->isLeaf && node->hasParticle){
-    printf("\nNodes in same tree");
+    //printf("\nNodes in same tree");
     if((node->bodyInNode.pos.x == particle.pos.x) && (node->bodyInNode.pos.y == particle.pos.y)){
-      printf("\nCRASH");
+      printf("\nTwo bodies in the same position --> CRASH\n");
       exit(1);
     }
     node->isLeaf = false;
@@ -147,12 +152,12 @@ vector ZERO_VECTOR(){
   v.y = 0;
   return v;
 }
-vector calcNumeratorCOM(struct Node* n) {
+vector calcNumeratorCOM(struct Node* n){
   struct vector v;
-  if(n->isLeaf && !n->hasParticle) {
+  if(n->isLeaf && !n->hasParticle){
     v = ZERO_VECTOR();
   }
-  else if(n->isLeaf && n->hasParticle) {
+  else if(n->isLeaf && n->hasParticle){
     v.x = n->bodyInNode.mass * n->bodyInNode.pos.x;
     v.y = n->bodyInNode.mass * n->bodyInNode.pos.y;
   }
@@ -185,35 +190,53 @@ void setCenterOfMasses(struct Node* n) {
   setCenterOfMasses(n->se);
 }
 
+void clearTree() {
+  freeTree(root);
+}
+
+void freeTree(struct Node* n) {
+  if(!n->isLeaf) {
+    freeTree(n->nw);
+    freeTree(n->ne);
+    freeTree(n->sw);
+    freeTree(n->se);
+  }
+  free(n);
+}
+
 int main(int argc, char *argv[]) {
   numberOfBodies = ((argc > 1)? atoi(argv[1]) : DEFAULTBODIES);
   numberOfTimesteps = ((argc > 2)? atoi(argv[2]) : DEFAULTTIMESTEPS);
+  far = ((argc > 3)? atoi(argv[3]) : DEFAULTFAR);
 
   initBodies();
   root = (Node*)malloc(sizeof(Node));
 
-  root->size = 100;
+  root->size = spaceSize;
   root->pos.x = 0;
   root->pos.y = 0;
   root->isLeaf = true;
   root->totalMass = 0.0;
   root->hasParticle = false;
 
-  for(int i = 0; i < numberOfBodies; i++){
-    insertIntoTree(bodies[i], root);
-  }
-  summarizeTree();
-  printf("\ncenter of mass of root {%lf, %lf}", root->centerOfMass.x, root->centerOfMass.y);
-
-  /*
   start_clock();
-  for(int i = 0; i < numberOfTimesteps; i++){
-    calculateForces();
-    moveBodies();
+  for(int j = 0; j < numberOfTimesteps; j++){
+    for(int i = 0; i < numberOfBodies; i++){
+      insertIntoTree(bodies[i], root);
+    }
+    summarizeTree();
+    for(int i = 0; i < numberOfBodies; i++){
+      calculateForces(bodies[i], root);
+      printf("\nForces on body %d is {%lf, %lf}", i + 1, bodies[i].vel.x, bodies[i].vel.y);
+    }
+    clearTree();
+    for(int i = 0; i < numberOfBodies; i++){
+      moveBodies(bodies[i]);
+      printf("\nPosition of body %d is {%lf, %lf}", i + 1, bodies[i].pos.x, bodies[i].pos.y);
+      printf("\nVelocity of body %d is {%lf, %lf}", i + 1, bodies[i].vel.x, bodies[i].vel.y);
+    }
   }
   end_clock();
-  */
-
 }
 
 void initBodies(){
@@ -221,45 +244,65 @@ void initBodies(){
   for(int i = 0; i < numberOfBodies; i++){
     time_t t;
     srand((unsigned) time(&t) * (i + 1));
-    bodies[i].pos.x = rand()%98 + 1;
-    bodies[i].pos.y = rand()%98 + 1;
-    bodies[i].mass = 1000;
+    bodies[i].pos.x = rand()%1000;
+    bodies[i].pos.y = rand()%1000;
+    bodies[i].mass = rand()%1000000000;
   }
 }
 
-void calculateForces(){
+void calculateForces(struct body currentBody, struct Node* currentNode){
   double distance;
   double magnitude;
   vector directions;
-  for(int i = 0; i < numberOfBodies - 1; i++) {
-    for(int j = i + 1; j < numberOfBodies; j++){
-      distance = sqrt(((bodies[i].pos.x - bodies[j].pos.x) * (bodies[i].pos.x - bodies[j].pos.x)) +
-      ((bodies[i].pos.y - bodies[j].pos.y) * (bodies[i].pos.y - bodies[j].pos.y)));
-      magnitude = G * ((bodies[i].mass * bodies[j].mass) / (distance * distance));
-      directions.x = bodies[j].pos.x - bodies[i].pos.x;
-      directions.y = bodies[j].pos.y - bodies[i].pos.y;
-      bodies[i].force.x = bodies[i].force.x + (magnitude * (directions.x / distance));
-      bodies[j].force.x = bodies[j].force.x - (magnitude * (directions.x / distance));
-      bodies[i].force.y = bodies[i].force.y + (magnitude * (directions.y / distance));
-      bodies[j].force.y = bodies[j].force.y - (magnitude * (directions.y / distance));
+  if(currentNode->isLeaf && !currentNode->hasParticle){
+    currentBody.force.x = 0;
+    currentBody.force.y = 0;
+  }else if(currentNode->isLeaf && currentNode->hasParticle){
+    distance = sqrt(((currentBody.pos.x - currentNode->bodyInNode.pos.x) * (currentBody.pos.x - currentNode->bodyInNode.pos.x)) +
+    ((currentBody.pos.y - currentNode->bodyInNode.pos.y) * (currentBody.pos.y - currentNode->bodyInNode.pos.y)));
+    magnitude = G * ((currentBody.mass * currentNode->bodyInNode.mass) / (distance * distance));
+    directions.x = currentNode->bodyInNode.pos.x - currentBody.pos.x;
+    directions.y = currentNode->bodyInNode.pos.y - currentBody.pos.y;
+    currentBody.force.x = (magnitude * (directions.x / distance));
+    currentBody.force.y = (magnitude * (directions.y / distance));
+
+  }else if(!currentNode->isLeaf && currentNode->hasParticle){
+    distance = sqrt(((currentBody.pos.x - currentNode->centerOfMass.x) * (currentBody.pos.x - currentNode->centerOfMass.y)) +
+    ((currentBody.pos.y - currentNode->centerOfMass.y) * (currentBody.pos.y - currentNode->centerOfMass.y)));
+    if(distance <= far){
+      calculateForces(currentBody, currentNode->nw);
+      calculateForces(currentBody, currentNode->ne);
+      calculateForces(currentBody, currentNode->sw);
+      calculateForces(currentBody, currentNode->se);
+    }else{
+      printf("\nApproximating");
+      magnitude = G * ((currentBody.mass * currentNode->totalMass) / (distance * distance));
+      directions.x = currentNode->centerOfMass.x - currentBody.pos.x;
+      directions.y = currentNode->centerOfMass.y - currentBody.pos.y;
+      currentBody.force.x =  (magnitude * (directions.x / distance));
+      currentBody.force.y =  (magnitude * (directions.y / distance));
     }
   }
 }
 
-void moveBodies() {
+void moveBodies(struct body currentBody) {
   vector deltap;
   vector deltav;
-  for(int i = 0; i < numberOfBodies; i++) {
-    deltav.x = (bodies[i].force.x / bodies[i].mass) * DT;
-    deltav.y = (bodies[i].force.y / bodies[i].mass) * DT;
-    deltap.x = (bodies[i].vel.x + deltav.x / 2) * DT,
-    deltap.y = (bodies[i].vel.y + deltav.y / 2) * DT,
-    bodies[i].vel.x = bodies[i].vel.x + deltav.x;
-    bodies[i].vel.y = bodies[i].vel.y + deltav.y;
-    bodies[i].pos.x = bodies[i].pos.x + deltap.x;
-    bodies[i].pos.y = bodies[i].pos.y + deltap.y;
-    bodies[i].force.x = bodies[i].force.y = 0.0;
+  deltav.x = (currentBody.force.x / currentBody.mass) * DT;
+  deltav.y = (currentBody.force.y / currentBody.mass) * DT;
+  deltap.x = (currentBody.vel.x + deltav.x / 2) * DT,
+  deltap.y = (currentBody.vel.y + deltav.y / 2) * DT,
+  currentBody.vel.x = currentBody.vel.x + deltav.x;
+  currentBody.vel.y = currentBody.vel.y + deltav.y;
+  currentBody.pos.x = currentBody.pos.x + deltap.x;
+  currentBody.pos.y = currentBody.pos.y + deltap.y;
+  if(currentBody.pos.x > spaceSize || currentBody.pos.x < 0){
+    currentBody.vel.x = currentBody.vel.x * -1;
   }
+  if(currentBody.pos.y > spaceSize || currentBody.pos.y < 0){
+    currentBody.vel.y = currentBody.vel.y * -1;
+  }
+  currentBody.force.x = currentBody.force.y = 0.0;
 }
 
 void start_clock(){
