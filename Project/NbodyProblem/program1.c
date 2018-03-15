@@ -1,98 +1,101 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
 #include <unistd.h>
 #include <time.h>
 #include <sys/times.h>
 
-#define NUMBEROFBODIES 10
-double DT = 100;
+#define DEFAULTBODIES 100
+#define DT 1
+#define DEFAULTTIMESTEPS 1000
+const double G = 0.0000000000667;
 
-static double G = 0.0000000000667;
-int calculateForces();
-int moveBodies();
+void calculateForces();
+void initBodies();
+void* work();
+void moveBodies();
 void start_clock(void);
 void end_clock();
-
 static clock_t st_time;
 static clock_t en_time;
 static struct tms st_cpu;
 static struct tms en_cpu;
+int numberOfBodies;
+int numberOfTimesteps;
+
+typedef struct vector{
+  double x;
+  double y;
+}vector;
 
 typedef struct body{
-    double posX;
-    double posY;
-    double velX;
-    double velY;
+    struct vector pos, vel, force;
     double mass;
-    double forceX;
-    double forceY;
-    double dirX;
-    double dirY;
-    double deltavX;
-    double deltavY;
-    double deltapX;
-    double deltapY;
 }body;
 
-body bodies[NUMBEROFBODIES];
+struct body *bodies;
 
-int main(){
-  for(int i = 0; i < NUMBEROFBODIES; i++){
-    time_t t;
-    srand((unsigned) time(&t) * (i + 1));
-    bodies[i].posX = rand()%1000;
-    bodies[i].posY = rand()%1000;
-    bodies[i].mass = 1000 + rand()%100000000000000000;
-  }
+int main(int argc, char *argv[]) {
+  numberOfBodies = ((argc > 1)? atoi(argv[1]) : DEFAULTBODIES);
+  numberOfTimesteps = ((argc > 2)? atoi(argv[2]) : DEFAULTTIMESTEPS);
+
+  initBodies();
+
   start_clock();
-
-  calculateForces();
-  moveBodies();
-
+  for(int i = 0; i < numberOfTimesteps; i++){
+    calculateForces();
+    moveBodies();
+  }
   end_clock();
 
-  for(int i = 0; i < NUMBEROFBODIES; i++){
-    printf("Body %d velX = %lf & velY = %lf le/s\n", i + 1, bodies[i].velX, bodies[i].velY);
-  }
-
 }
 
-int calculateForces(){
+void initBodies(){
+  bodies = (body*)malloc(sizeof(body) * numberOfBodies);
+  for(int i = 0; i < numberOfBodies; i++){
+    time_t t;
+    srand((unsigned) time(&t) * (i + 1));
+    bodies[i].pos.x = rand()%1000;
+    bodies[i].pos.y = rand()%1000;
+    bodies[i].mass = 1 + rand()%100000000000;
+  }
+}
+
+void calculateForces(){
   double distance;
   double magnitude;
-  body direction;
-  for(int i = 0; i < NUMBEROFBODIES - 1; i++) {
-    int j = i + 1;
-    distance = sqrt(((bodies[i].posX - bodies[j].posX) * (bodies[i].posX - bodies[j].posX)) +
-    ((bodies[i].posY - bodies[j].posY) * (bodies[i].posY - bodies[j].posY)));
-    //printf("\nDistance between body %d and %d: %lf le", i + 1, j + 1, distance);
-    magnitude = G * ((bodies[i].mass * bodies[j].mass) / (distance * distance));
-    //printf("\nMagnitude for these bodies are: %f Newton\n", magnitude);
-    direction.dirX = bodies[j].posX - bodies[i].posX;
-    direction.dirY = bodies[j].posY - bodies[i].posY;
-    bodies[i].forceX = bodies[i].forceX + (magnitude * (direction.dirX / distance));
-    bodies[j].forceX = bodies[j].forceX - (magnitude * (direction.dirX / distance));
-    bodies[i].forceY = bodies[i].forceY + (magnitude * (direction.dirY / distance));
-    bodies[j].forceY = bodies[j].forceY - (magnitude * (direction.dirY / distance));
-  }
-}
-  int moveBodies() {
-    body deltap;
-    body deltav;
-    for(int i = 0; i < NUMBEROFBODIES; i++) {
-      deltav.deltavX = (bodies[i].forceX / bodies[i].mass) * DT;
-      deltav.deltavY = (bodies[i].forceY / bodies[i].mass) * DT;
-      deltap.deltapX = (bodies[i].velX + deltav.deltavX / 2) * DT,
-      deltap.deltapY = (bodies[i].velY + deltav.deltavY / 2) * DT,
-      bodies[i].velX = bodies[i].velX + deltav.deltavX;
-      bodies[i].velY = bodies[i].velY + deltav.deltavY;
-      bodies[i].posX = bodies[i].posX + deltap.deltapX;
-      bodies[i].posY = bodies[i].posY + deltap.deltapY;
-      bodies[i].forceX = bodies[i].forceY = 0.0; // reset force vector
+  vector directions;
+  for(int i = 0; i < numberOfBodies - 1; i++) {
+    for(int j = i + 1; j < numberOfBodies; j++){
+      distance = sqrt(((bodies[i].pos.x - bodies[j].pos.x) * (bodies[i].pos.x - bodies[j].pos.x)) +
+      ((bodies[i].pos.y - bodies[j].pos.y) * (bodies[i].pos.y - bodies[j].pos.y)));
+      magnitude = G * ((bodies[i].mass * bodies[j].mass) / (distance * distance));
+      directions.x = bodies[j].pos.x - bodies[i].pos.x;
+      directions.y = bodies[j].pos.y - bodies[i].pos.y;
+      bodies[i].force.x = bodies[i].force.x + (magnitude * (directions.x / distance));
+      bodies[j].force.x = bodies[j].force.x - (magnitude * (directions.x / distance));
+      bodies[i].force.y = bodies[i].force.y + (magnitude * (directions.y / distance));
+      bodies[j].force.y = bodies[j].force.y - (magnitude * (directions.y / distance));
+    }
   }
 }
 
+void moveBodies() {
+  vector deltap;
+  vector deltav;
+  for(int i = 0; i < numberOfBodies; i++) {
+    deltav.x = (bodies[i].force.x / bodies[i].mass) * DT;
+    deltav.y = (bodies[i].force.y / bodies[i].mass) * DT;
+    deltap.x = (bodies[i].vel.x + deltav.x / 2) * DT,
+    deltap.y = (bodies[i].vel.y + deltav.y / 2) * DT,
+    bodies[i].vel.x = bodies[i].vel.x + deltav.x;
+    bodies[i].vel.y = bodies[i].vel.y + deltav.y;
+    bodies[i].pos.x = bodies[i].pos.x + deltap.x;
+    bodies[i].pos.y = bodies[i].pos.y + deltap.y;
+    bodies[i].force.x = bodies[i].force.y = 0.0;
+  }
+}
 
 void start_clock(){
     st_time = times(&st_cpu);
