@@ -93,7 +93,6 @@ void insertIntoTree(body particle, Node* node){
     insertIntoTree(particle, newNodeToGoTo);
   }
   else if(node->isLeaf && node->hasParticle){
-    //printf("\nNodes in same tree");
     if((node->bodyInNode.pos.x == particle.pos.x) && (node->bodyInNode.pos.y == particle.pos.y)){
       printf("\nTwo bodies in the same position --> CRASH\n");
       exit(1);
@@ -173,7 +172,6 @@ vector calcNumeratorCOM(struct Node* n){
 }
 
 void setCenterOfMasses(struct Node* n) {
-  // Only set center of mass on internal nodes
   if(n->isLeaf){
     return;
   }
@@ -196,7 +194,6 @@ void freeTree(struct Node* n) {
     freeTree(n->sw);
     freeTree(n->se);
   }
-  //printf("\nFreeing leaf");
   free(n);
 }
 
@@ -218,24 +215,16 @@ int main(int argc, char *argv[]) {
     root->hasParticle = false;
 
     for(int i = 0; i < numberOfBodies; i++){
-      //printf("\nBody %d beeing inserted into tree...\n", i + 1 );
       insertIntoTree(bodies[i], root);
     }
     summarizeTree();
     for(int i = 0; i < numberOfBodies; i++){
-      //printf("\n\ncalculation forces on body %d\n", i + 1);
       calculateForces(i, root);
-      //printf("\nForces on body %d is {%lf, %lf}", i + 1, bodies[i].force.x, bodies[i].force.y);
     }
 
     for(int i = 0; i < numberOfBodies; i++){
-      //printf("\nMoving body %d\n", i + 1);
       moveBodies(i);
-      //printf("\nVelocity of body %d is {%lf, %lf}", i + 1, bodies[i].vel.x, bodies[i].vel.y);
-      //printf("\nPosition of body %d is {%lf, %lf}", i + 1, bodies[i].pos.x, bodies[i].pos.y);
-      //printf("\nVelocity of body %d is {%lf, %lf}", i + 1, bodies[i].vel.x, bodies[i].vel.y);
     }
-    //printf("\nReseting tree..\n");
     freeTree(root);
   }
   end_clock();
@@ -259,13 +248,10 @@ void calculateForces(int currentBody, struct Node* currentNode){
   double distance;
   double magnitude;
   vector directions;
-  //printf("\nPosition of current body {%lf, %lf}", bodies[currentBody].pos.x, bodies[currentBody].pos.y );
   if(currentNode->isLeaf && !currentNode->hasParticle){
-    //printf("\nFound Empty leaf node");
     bodies[currentBody].force.x += 0;
     bodies[currentBody].force.y += 0;
   }else if(currentNode->isLeaf && currentNode->hasParticle){
-    //printf("\nFound Particle in leaf node -> adding forces");
     distance = sqrt(((bodies[currentBody].pos.x - currentNode->bodyInNode.pos.x) * (bodies[currentBody].pos.x - currentNode->bodyInNode.pos.x)) +
     ((bodies[currentBody].pos.y - currentNode->bodyInNode.pos.y) * (bodies[currentBody].pos.y - currentNode->bodyInNode.pos.y)));
     if(distance < 0.00010 ){
@@ -274,9 +260,6 @@ void calculateForces(int currentBody, struct Node* currentNode){
     magnitude = G * ((bodies[currentBody].mass * currentNode->bodyInNode.mass) / (distance * distance));
     directions.x = currentNode->bodyInNode.pos.x - bodies[currentBody].pos.x;
     directions.y = currentNode->bodyInNode.pos.y - bodies[currentBody].pos.y;
-    //printf("\nmagnitude = %lf", magnitude );
-    //printf("\ndirections = {%lf, %lf}", directions.x, directions.y);
-    //printf("\ndistance = %lf", distance);
     bodies[currentBody].force.x += (magnitude * (directions.x / distance));
     bodies[currentBody].force.y += (magnitude * (directions.y / distance));
 
@@ -287,18 +270,12 @@ void calculateForces(int currentBody, struct Node* currentNode){
       distance = 1;
     }
     if(distance > far){
-      //printf("\ndistance > far --> approximating center of mass ");
       magnitude = G * ((bodies[currentBody].mass * currentNode->totalMass) / (distance * distance));
       directions.x = currentNode->centerOfMass.x - bodies[currentBody].pos.x;
       directions.y = currentNode->centerOfMass.y - bodies[currentBody].pos.y;
-      //printf("\ntotalMass in cluster = %lf", currentNode->totalMass );
-      //printf("\nmagnitude = %lf", magnitude );
-      //printf("\ndirections = {%lf, %lf}", directions.x, directions.y);
-      //printf("\ndistance = %lf", distance);
       bodies[currentBody].force.x +=  (magnitude * (directions.x / distance));
       bodies[currentBody].force.y +=  (magnitude * (directions.y / distance));
     }else{
-      //printf("\ndistance < far --> recursive looking for nodes in children");
       calculateForces(currentBody, currentNode->nw);
       calculateForces(currentBody, currentNode->ne);
       calculateForces(currentBody, currentNode->sw);

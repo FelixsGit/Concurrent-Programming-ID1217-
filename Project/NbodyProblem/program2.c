@@ -65,9 +65,10 @@ int main(int argc, char *argv[]) {
 
   /*
   for(int i = 0; i < numberOfBodies; i++){
-    printf("\nBody %d has Mass %lf & velX = %lf & velY = %lf", i, bodies[i].mass, bodies[i].velX, bodies[i].velY);
+    printf("\nBody %d has Mass %lf & velX = %lf & velY = %lf", i, bodies[i].mass, bodies[i].vel.x, bodies[i].vel.y);
   }
   */
+
 }
 
 void* work(void* arg){
@@ -83,8 +84,8 @@ void* work(void* arg){
 void initBodies(){
   bodies = (body*)malloc(sizeof(body) * numberOfBodies);
   force = malloc(sizeof *force * numberOfThreads);
-  if (force){
-    for (int i = 0; i < numberOfThreads; i++){
+  if(force){
+    for(int i = 0; i < numberOfThreads; i++){
       force[i] = malloc(sizeof *force[i] * numberOfBodies);
     }
   }
@@ -133,7 +134,7 @@ void moveBodies(long id) {
     bodies[i].vel.y = bodies[i].vel.y + deltav.y;
     bodies[i].pos.x = bodies[i].pos.x + deltap.x;
     bodies[i].pos.y = bodies[i].pos.y + deltap.y;
-    bodies[i].force.x = bodies[i].force.y = 0.0; // reset force vector
+    bodies[i].force.x = bodies[i].force.y = 0.0;
   }
 }
 

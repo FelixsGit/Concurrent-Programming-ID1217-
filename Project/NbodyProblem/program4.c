@@ -7,8 +7,8 @@
 #include <sys/times.h>
 #include <omp.h>
 
-#define DEFAULTBODIES 100
 #define DT 1
+#define DEFAULTBODIES 100
 #define DEFAULTTIMESTEPS 1000
 #define DEFAULTFAR 10
 #define DEFAULTWORKERS 4
@@ -30,6 +30,8 @@ int numWorkers;
 double far;
 double spaceSize = 1000;
 double start_time, end_time;
+double start_time_forceCalc, end_time_forceCalc;
+double start_time_treeBuild, end_time_treeBuild;
 
 typedef struct vector{
   double x;
@@ -40,8 +42,6 @@ typedef struct body{
     struct vector pos, vel, force;
     double mass;
 }body;
-
-body* bodies;
 
 typedef struct Node{
   struct body bodyInNode;
@@ -57,9 +57,10 @@ typedef struct Node{
   struct vector centerOfMass;
 }Node;
 
+body* bodies;
 Node *root;
 
-Node* findQuadrant(vector pos, Node* parent){
+struct Node* findQuadrant(vector pos, Node* parent){
   if(pos.x >= parent->pos.x + parent->size/2){
    if(pos.y >= parent->pos.y + parent->size/2){
      //printf("\nParticle with pos {%lf, %lf} was found in NE",pos.x,pos.y);
@@ -144,13 +145,13 @@ void summarizeTree() {
   setCenterOfMasses(root);
 }
 
-vector ZERO_VECTOR(){
+struct vector ZERO_VECTOR(){
   struct vector v;
   v.x = 0;
   v.y = 0;
   return v;
 }
-vector calcNumeratorCOM(struct Node* n){
+struct vector calcNumeratorCOM(struct Node* n){
   struct vector v;
   if(n->isLeaf && !n->hasParticle){
     v = ZERO_VECTOR();
@@ -180,7 +181,6 @@ void setCenterOfMasses(struct Node* n) {
   res.x = v.x / n->totalMass;
   res.y = v.y / n->totalMass;
   n->centerOfMass = res;
-
   setCenterOfMasses(n->nw);
   setCenterOfMasses(n->ne);
   setCenterOfMasses(n->sw);
@@ -195,49 +195,6 @@ void freeTree(struct Node* n) {
     freeTree(n->se);
   }
   free(n);
-}
-
-int main(int argc, char *argv[]) {
-  numberOfBodies = ((argc > 1)? atoi(argv[1]) : DEFAULTBODIES);
-  numberOfTimesteps = ((argc > 2)? atoi(argv[2]) : DEFAULTTIMESTEPS);
-  far = ((argc > 3)? atoi(argv[3]) : DEFAULTFAR);
-  numWorkers = ((argc > 4)? atoi(argv[4]) : DEFAULTWORKERS);
-  omp_set_num_threads(numWorkers);
-
-  initBodies();
-
-  start_time = omp_get_wtime();
-  for(int j = 0; j < numberOfTimesteps; j++){
-    root = (Node*)malloc(sizeof(Node));
-    root->size = spaceSize;
-    root->pos.x = 0;
-    root->pos.y = 0;
-    root->isLeaf = true;
-    root->totalMass = 0.0;
-    root->hasParticle = false;
-
-    for(int i = 0; i < numberOfBodies; i++){
-      insertIntoTree(bodies[i], root);
-    }
-    summarizeTree();
-    #pragma omp parallel
-    {
-      #pragma omp for schedule(dynamic)
-      for(int i = 0; i < numberOfBodies; i++){
-        calculateForces(i, root);
-      }
-    }
-      for(int i = 0; i < numberOfBodies; i++){
-        moveBodies(i);
-      }
-
-    freeTree(root);
-  }
-  end_time = omp_get_wtime();
-  for(int i = 0; i <numberOfBodies; i++){
-    printf("\nVelocity of body %d is {%lf, %lf}", i + 1, bodies[i].vel.x, bodies[i].vel.y);
-  }
-    printf("\nThe execution time is %g sec", end_time - start_time);
 }
 
 void initBodies(){
@@ -309,4 +266,57 @@ void moveBodies(int currentBody) {
     bodies[currentBody].vel.y = bodies[currentBody].vel.y * -1;
   }
   bodies[currentBody].force.x = bodies[currentBody].force.y = 0.0;
+}
+
+int main(int argc, char *argv[]) {
+  numberOfBodies = ((argc > 1)? atoi(argv[1]) : DEFAULTBODIES);
+  numberOfTimesteps = ((argc > 2)? atoi(argv[2]) : DEFAULTTIMESTEPS);
+  far = ((argc > 3)? atoi(argv[3]) : DEFAULTFAR);
+  numWorkers = ((argc > 4)? atoi(argv[4]) : DEFAULTWORKERS);
+  omp_set_num_threads(numWorkers);
+
+  initBodies();
+
+  start_time = omp_get_wtime();
+  for(int j = 0; j < numberOfTimesteps; j++){
+    root = (Node*)malloc(sizeof(Node));
+    root->size = spaceSize;
+    root->pos.x = 0;
+    root->pos.y = 0;
+    root->isLeaf = true;
+    root->totalMass = 0.0;
+    root->hasParticle = false;
+    start_time_treeBuild += omp_get_wtime();
+    for(int i = 0; i < numberOfBodies; i++){
+      insertIntoTree(bodies[i], root);
+    }
+    summarizeTree();
+    end_time_treeBuild += omp_get_wtime();
+    start_time_forceCalc += omp_get_wtime();
+    #pragma omp parallel
+    {
+      #pragma omp for schedule(dynamic)
+      for(int i = 0; i < numberOfBodies; i++){
+        calculateForces(i, root);
+      }
+    }
+    end_time_forceCalc += omp_get_wtime();
+    for(int i = 0; i < numberOfBodies; i++){
+      moveBodies(i);
+    }
+    freeTree(root);
+  }
+  end_time = omp_get_wtime();
+  /*
+  for(int i = 0; i <numberOfBodies; i++){
+    printf("\nVelocity of body %d is {%lf, %lf}", i + 1, bodies[i].vel.x, bodies[i].vel.y);
+  }
+  */
+  double totalTime = end_time - start_time;
+  double executionTime = end_time_forceCalc - start_time_forceCalc;
+  double buildTreeTime = end_time_treeBuild - start_time_treeBuild;
+  printf("\nBODIES = %d --- TIMESTEPS = %d --- FAR = %lf --- THREADS = %d\n",numberOfBodies, numberOfTimesteps, far, numWorkers);
+  printf("\nThe execution time is %g sec", totalTime);
+  printf("\nThe execution time on building & summarizing the tree are %g procent off total time", (buildTreeTime/totalTime)*100);
+  printf("\nThe execution time on calculateFroces is %g procent off total time\n", (executionTime/totalTime)*100);
 }
